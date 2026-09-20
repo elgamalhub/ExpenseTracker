@@ -821,4 +821,573 @@
       searchPlaceholder: "Search transactions",
       allChip: "All",
       emptyTitle: "Nothing here yet",
-      emptyBody: "Add an exp
+      emptyBody: "Add an expense above to start this month\u2019s ledger.",
+      today: "Today",
+      yesterday: "Yesterday",
+      exportCSV: "Export CSV",
+      clearAll: "Clear all data",
+      toastNoAmount: "Enter an amount greater than zero",
+      toastAdded: "Added to ledger",
+      toastDeleted: "Entry deleted",
+      toastNoExport: "No expenses to export yet",
+      toastExported: "Export downloaded",
+      toastExportFailed: "Couldn't export in this browser",
+      toastNothingToClear: "Nothing to clear",
+      toastCleared: "All data cleared",
+      toastSaveFailed: "Couldn't save — storage unavailable",
+      confirmClear: "Delete every expense and budget on this device? This can't be undone.",
+      deleteLabel: "Delete",
+      dateLocale: "en-US"
+    },
+    ar: {
+      appTitle: "دفتر — متتبع المصروفات",
+      appMark: "دفتر",
+      langToggleLabel: "تغيير اللغة",
+      langToggleShort: "ع",
+      themeToggleLabel: "تبديل الوضع الداكن",
+      prevMonth: "الشهر السابق",
+      nextMonth: "الشهر التالي",
+      budgetLink: "الميزانية",
+      editLink: "تعديل",
+      summaryLabel: "الإنفاق هذا الشهر",
+      setBudget: "حدد ميزانية شهرية",
+      leftOf: function (remaining, budget) { return fmtMoney(remaining) + " متبقٍّ من " + fmtMoney(budget); },
+      overBudget: function (over, budget) { return fmtMoney(over) + " زيادة عن " + fmtMoney(budget); },
+      budgetPlaceholder: "الميزانية الشهرية",
+      save: "حفظ",
+      statDaily: "المعدل اليومي",
+      statCount: "المعاملات",
+      statTop: "أعلى فئة",
+      catSectionTitle: "حسب الفئة",
+      noSpending: "لم يتم تسجيل أي إنفاق هذا الشهر بعد.",
+      addFormTitle: "إضافة مصروف",
+      descPlaceholder: "الوصف",
+      amountPlaceholder: "المبلغ",
+      addToLedger: "أضف إلى الدفتر",
+      searchPlaceholder: "بحث في المعاملات",
+      allChip: "الكل",
+      emptyTitle: "لا يوجد شيء بعد",
+      emptyBody: "أضف مصروفًا أعلاه لبدء دفتر هذا الشهر.",
+      today: "اليوم",
+      yesterday: "أمس",
+      exportCSV: "تصدير CSV",
+      clearAll: "مسح كل البيانات",
+      toastNoAmount: "أدخل مبلغًا أكبر من صفر",
+      toastAdded: "أُضيف إلى الدفتر",
+      toastDeleted: "تم حذف القيد",
+      toastNoExport: "لا توجد مصروفات للتصدير بعد",
+      toastExported: "تم تنزيل التصدير",
+      toastExportFailed: "تعذر التصدير في هذا المتصفح",
+      toastNothingToClear: "لا يوجد شيء لمسحه",
+      toastCleared: "تم مسح جميع البيانات",
+      toastSaveFailed: "تعذر الحفظ — التخزين غير متاح",
+      confirmClear: "هل تريد حذف كل المصروفات والميزانيات على هذا الجهاز؟ لا يمكن التراجع عن هذا الإجراء.",
+      deleteLabel: "حذف",
+      dateLocale: "ar"
+    }
+  };
+
+  var STORAGE_KEY = "ledger.expenses.v1";
+  var BUDGET_KEY = "ledger.budgets.v1";
+  var THEME_KEY = "ledger.theme.v1";
+  var LANG_KEY = "ledger.lang.v1";
+
+  var state = {
+    expenses: [],
+    budgets: {},
+    viewDate: new Date(),
+    activeCategory: "all",
+    searchTerm: "",
+    lang: "en"
+  };
+
+  function t(key) {
+    return STRINGS[state.lang][key];
+  }
+
+  function catById(id) {
+    for (var i = 0; i < CATEGORIES.length; i++) if (CATEGORIES[i].id === id) return CATEGORIES[i];
+    return CATEGORIES[CATEGORIES.length - 1];
+  }
+
+  function catName(id) {
+    var c = catById(id);
+    return state.lang === "ar" ? c.ar : c.en;
+  }
+
+  function monthKey(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  }
+
+  function fmtMoney(n) {
+    var neg = n < 0;
+    n = Math.abs(n);
+    var s = n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (neg ? "-$" : "$") + s;
+  }
+
+  function fmtDateHeader(iso) {
+    var d = new Date(iso + "T00:00:00");
+    var today = new Date();
+    var todayStr = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0");
+    var yest = new Date(today); yest.setDate(yest.getDate() - 1);
+    var yestStr = yest.getFullYear() + "-" + String(yest.getMonth()+1).padStart(2,"0") + "-" + String(yest.getDate()).padStart(2,"0");
+    if (iso === todayStr) return t("today");
+    if (iso === yestStr) return t("yesterday");
+    return d.toLocaleDateString(t("dateLocale"), { weekday: "long", month: "long", day: "numeric", numberingSystem: "latn" });
+  }
+
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ---------- persistence ----------
+
+  function loadData() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      state.expenses = raw ? JSON.parse(raw) : [];
+    } catch (e) { state.expenses = []; }
+    try {
+      var rawB = localStorage.getItem(BUDGET_KEY);
+      state.budgets = rawB ? JSON.parse(rawB) : {};
+    } catch (e) { state.budgets = {}; }
+    try {
+      var theme = localStorage.getItem(THEME_KEY);
+      if (theme) document.documentElement.setAttribute("data-theme", theme);
+    } catch (e) {}
+    state.lang = detectLanguage();
+  }
+
+  function detectLanguage() {
+    try {
+      var saved = localStorage.getItem(LANG_KEY);
+      if (saved === "en" || saved === "ar") return saved;
+    } catch (e) {}
+    var sysLangs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || "en"];
+    var sysIsArabic = sysLangs.some(function (l) { return /^ar/i.test(l); });
+    return sysIsArabic ? "ar" : "en";
+  }
+
+  function setLanguage(lang) {
+    state.lang = lang;
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    applyStaticText();
+    populateCategorySelect();
+    render();
+  }
+
+  function applyStaticText() {
+    document.title = t("appTitle");
+    document.getElementById("appMarkText").textContent = t("appMark");
+    document.getElementById("langToggle").textContent = t("langToggleShort");
+    document.getElementById("langToggle").title = t("langToggleLabel");
+    document.getElementById("langToggle").setAttribute("aria-label", t("langToggleLabel"));
+    document.getElementById("themeToggle").title = t("themeToggleLabel");
+    document.getElementById("themeToggle").setAttribute("aria-label", t("themeToggleLabel"));
+    document.getElementById("prevMonth").setAttribute("aria-label", t("prevMonth"));
+    document.getElementById("nextMonth").setAttribute("aria-label", t("nextMonth"));
+    document.getElementById("summaryLabel").textContent = t("summaryLabel");
+    document.getElementById("budgetInput").placeholder = t("budgetPlaceholder");
+    document.getElementById("saveBudgetBtn").textContent = t("save");
+    document.getElementById("statDailyLabel").textContent = t("statDaily");
+    document.getElementById("statCountLabel").textContent = t("statCount");
+    document.getElementById("statTopLabel").textContent = t("statTop");
+    document.getElementById("catSectionTitle").textContent = t("catSectionTitle");
+    document.getElementById("addFormTitle").textContent = t("addFormTitle");
+    document.getElementById("inpDesc").placeholder = t("descPlaceholder");
+    document.getElementById("inpAmount").placeholder = t("amountPlaceholder");
+    document.getElementById("addBtn").textContent = t("addToLedger");
+    document.getElementById("searchInput").placeholder = t("searchPlaceholder");
+    document.getElementById("exportBtn").textContent = t("exportCSV");
+    document.getElementById("clearBtn").textContent = t("clearAll");
+  }
+
+  function saveExpenses() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.expenses)); }
+    catch (e) { showToast(t("toastSaveFailed")); }
+  }
+
+  function saveBudgets() {
+    try { localStorage.setItem(BUDGET_KEY, JSON.stringify(state.budgets)); }
+    catch (e) {}
+  }
+
+  // ---------- toast ----------
+
+  var toastTimer = null;
+  function showToast(msg) {
+    var el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2200);
+  }
+
+  // ---------- rendering ----------
+
+  function populateCategorySelect() {
+    var sel = document.getElementById("inpCategory");
+    var prevValue = sel.value;
+    sel.innerHTML = "";
+    CATEGORIES.forEach(function (c) {
+      var opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = catName(c.id);
+      sel.appendChild(opt);
+    });
+    if (prevValue) sel.value = prevValue;
+  }
+
+  function renderFilterChips() {
+    var row = document.getElementById("filterRow");
+    row.innerHTML = "";
+    var all = document.createElement("button");
+    all.className = "chip" + (state.activeCategory === "all" ? " active" : "");
+    all.textContent = t("allChip");
+    all.onclick = function () { state.activeCategory = "all"; render(); };
+    row.appendChild(all);
+    CATEGORIES.forEach(function (c) {
+      var chip = document.createElement("button");
+      chip.className = "chip" + (state.activeCategory === c.id ? " active" : "");
+      chip.textContent = catName(c.id);
+      chip.onclick = function () { state.activeCategory = c.id; render(); };
+      row.appendChild(chip);
+    });
+  }
+
+  function expensesForMonth() {
+    var key = monthKey(state.viewDate);
+    return state.expenses.filter(function (e) { return e.date.slice(0, 7) === key; });
+  }
+
+  function render() {
+    var monthEx = expensesForMonth();
+    var total = monthEx.reduce(function (s, e) { return s + e.amount; }, 0);
+
+    document.getElementById("monthLabel").textContent = state.viewDate.toLocaleDateString(t("dateLocale"), { month: "long", year: "numeric", numberingSystem: "latn" });
+    document.getElementById("totalSpent").textContent = fmtMoney(total);
+    document.getElementById("editBudgetBtn").textContent = t("budgetLink");
+
+    var key = monthKey(state.viewDate);
+    var budget = state.budgets[key];
+    var budgetLine = document.getElementById("budgetLine");
+    var fill = document.getElementById("progressFill");
+    if (budget && budget > 0) {
+      var pct = Math.min(100, (total / budget) * 100);
+      var remaining = budget - total;
+      budgetLine.innerHTML = (remaining >= 0
+        ? t("leftOf")(remaining, budget)
+        : t("overBudget")(Math.abs(remaining), budget)) + ' · <button id="editBudgetBtn2">' + t("editLink") + '</button>';
+      fill.style.width = pct + "%";
+      fill.classList.toggle("over", total > budget);
+      document.getElementById("editBudgetBtn2").onclick = openBudgetEdit;
+    } else {
+      budgetLine.innerHTML = '<button id="editBudgetBtn2">' + t("setBudget") + '</button>';
+      fill.style.width = "0%";
+      fill.classList.remove("over");
+      document.getElementById("editBudgetBtn2").onclick = openBudgetEdit;
+    }
+
+    // stats
+    var daysInMonth = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() + 1, 0).getDate();
+    var now = new Date();
+    var isCurrentMonth = monthKey(now) === key;
+    var elapsedDays = isCurrentMonth ? now.getDate() : daysInMonth;
+    document.getElementById("statDaily").textContent = fmtMoney(elapsedDays ? total / elapsedDays : 0);
+    document.getElementById("statCount").textContent = String(monthEx.length);
+
+    var byCat = {};
+    monthEx.forEach(function (e) { byCat[e.category] = (byCat[e.category] || 0) + e.amount; });
+    var sortedCats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
+    document.getElementById("statTop").textContent = sortedCats.length ? catName(sortedCats[0]) : "—";
+
+    // category breakdown
+    var catList = document.getElementById("catList");
+    catList.innerHTML = "";
+    if (!sortedCats.length) {
+      catList.innerHTML = '<div class="empty-note">' + t("noSpending") + '</div>';
+    } else {
+      var maxVal = byCat[sortedCats[0]];
+      sortedCats.forEach(function (cid) {
+        var c = catById(cid);
+        var row = document.createElement("div");
+        row.className = "cat-row";
+        row.innerHTML =
+          '<span class="cat-dot" style="background:var(' + c.varc + ')"></span>' +
+          '<span class="cat-name">' + escapeHtml(catName(cid)) + '</span>' +
+          '<span class="cat-bar-track" dir="ltr"><span class="cat-bar-fill" style="width:' + (byCat[cid] / maxVal * 100) + '%;background:var(' + c.varc + ')"></span></span>' +
+          '<span class="cat-amount tnum">' + fmtMoney(byCat[cid]) + '</span>';
+        catList.appendChild(row);
+      });
+    }
+
+    renderFilterChips();
+    renderLedger(monthEx);
+  }
+
+  function renderLedger(monthEx) {
+    var body = document.getElementById("ledgerBody");
+    body.innerHTML = "";
+
+    var filtered = monthEx.filter(function (e) {
+      if (state.activeCategory !== "all" && e.category !== state.activeCategory) return false;
+      if (state.searchTerm && e.description.toLowerCase().indexOf(state.searchTerm.toLowerCase()) === -1) return false;
+      return true;
+    });
+
+    if (!filtered.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.innerHTML = '<div class="serif">' + escapeHtml(t("emptyTitle")) + '</div><p>' + escapeHtml(t("emptyBody")) + '</p>';
+      body.appendChild(empty);
+      return;
+    }
+
+    filtered.sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return b.createdAt - a.createdAt;
+    });
+
+    var groups = [];
+    var lastDate = null;
+    filtered.forEach(function (e) {
+      if (e.date !== lastDate) {
+        groups.push({ date: e.date, items: [] });
+        lastDate = e.date;
+      }
+      groups[groups.length - 1].items.push(e);
+    });
+
+    groups.forEach(function (g) {
+      var wrap = document.createElement("div");
+      wrap.className = "ledger-group";
+      var header = document.createElement("div");
+      header.className = "ledger-date";
+      header.textContent = fmtDateHeader(g.date);
+      wrap.appendChild(header);
+
+      g.items.forEach(function (e) {
+        var c = catById(e.category);
+        var name = catName(e.category);
+        var row = document.createElement("div");
+        row.className = "ledger-row";
+        row.innerHTML =
+          '<span class="cat-dot" style="background:var(' + c.varc + ')"></span>' +
+          '<div class="ledger-main">' +
+            '<div class="ledger-desc">' + escapeHtml(e.description || name) + '</div>' +
+            '<div class="ledger-cat">' + escapeHtml(name) + '</div>' +
+          '</div>' +
+          '<div class="ledger-amount tnum">' + fmtMoney(e.amount) + '</div>' +
+          '<button class="ledger-delete" aria-label="' + escapeHtml(t("deleteLabel")) + '">\u00D7</button>';
+        row.querySelector(".ledger-delete").onclick = function () { deleteExpense(e.id); };
+        wrap.appendChild(row);
+      });
+
+      body.appendChild(wrap);
+    });
+  }
+
+  function escapeHtml(s) {
+    var div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  // ---------- actions ----------
+
+  function addExpense() {
+    var date = document.getElementById("inpDate").value || todayISO();
+    var category = document.getElementById("inpCategory").value;
+    var descEl = document.getElementById("inpDesc");
+    var amtEl = document.getElementById("inpAmount");
+    var desc = descEl.value.trim();
+    var amount = parseFloat(amtEl.value);
+
+    if (!amount || amount <= 0 || isNaN(amount)) {
+      showToast(t("toastNoAmount"));
+      amtEl.focus();
+      return;
+    }
+
+    state.expenses.push({
+      id: uid(),
+      date: date,
+      category: category,
+      description: desc,
+      amount: Math.round(amount * 100) / 100,
+      createdAt: Date.now()
+    });
+    saveExpenses();
+    descEl.value = "";
+    amtEl.value = "";
+    descEl.focus();
+
+    var entryMonth = new Date(date + "T00:00:00");
+    state.viewDate = new Date(entryMonth.getFullYear(), entryMonth.getMonth(), 1);
+
+    render();
+    showToast(t("toastAdded"));
+  }
+
+  function deleteExpense(id) {
+    state.expenses = state.expenses.filter(function (e) { return e.id !== id; });
+    saveExpenses();
+    render();
+    showToast(t("toastDeleted"));
+  }
+
+  function openBudgetEdit() {
+    var row = document.getElementById("budgetEditRow");
+    var key = monthKey(state.viewDate);
+    document.getElementById("budgetInput").value = state.budgets[key] || "";
+    row.classList.add("open");
+    document.getElementById("budgetInput").focus();
+  }
+
+  function saveBudget() {
+    var key = monthKey(state.viewDate);
+    var val = parseFloat(document.getElementById("budgetInput").value);
+    if (val && val > 0) {
+      state.budgets[key] = Math.round(val * 100) / 100;
+    } else {
+      delete state.budgets[key];
+    }
+    saveBudgets();
+    document.getElementById("budgetEditRow").classList.remove("open");
+    render();
+  }
+
+  function toCSV() {
+    var rows = [["Date", "Category", "Description", "Amount"]];
+    state.expenses
+      .slice()
+      .sort(function (a, b) { return a.date < b.date ? -1 : 1; })
+      .forEach(function (e) {
+        rows.push([e.date, catName(e.category), e.description || "", e.amount.toFixed(2)]);
+      });
+    return rows.map(function (r) {
+      return r.map(function (cell) {
+        cell = String(cell).replace(/"/g, '""');
+        return /[",\n]/.test(cell) ? '"' + cell + '"' : cell;
+      }).join(",");
+    }).join("\n");
+  }
+
+  function exportCSV() {
+    if (!state.expenses.length) {
+      showToast(t("toastNoExport"));
+      return;
+    }
+    var csv = toCSV();
+    try {
+      var blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "ledger-export.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      showToast(t("toastExported"));
+    } catch (e) {
+      showToast(t("toastExportFailed"));
+    }
+  }
+
+  function clearAll() {
+    if (!state.expenses.length && !Object.keys(state.budgets).length) {
+      showToast(t("toastNothingToClear"));
+      return;
+    }
+    if (!confirm(t("confirmClear"))) return;
+    state.expenses = [];
+    state.budgets = {};
+    saveExpenses();
+    saveBudgets();
+    render();
+    showToast(t("toastCleared"));
+  }
+
+  function toggleTheme() {
+    var cur = document.documentElement.getAttribute("data-theme");
+    var next;
+    if (!cur) {
+      var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      next = prefersDark ? "light" : "dark";
+    } else {
+      next = cur === "dark" ? "light" : "dark";
+    }
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+  }
+
+  function toggleLanguage() {
+    setLanguage(state.lang === "ar" ? "en" : "ar");
+  }
+
+  // ---------- wiring ----------
+
+  function init() {
+    loadData();
+    applyStaticText();
+    populateCategorySelect();
+    document.getElementById("inpDate").value = todayISO();
+
+    document.getElementById("addBtn").onclick = addExpense;
+    document.getElementById("inpAmount").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") addExpense();
+    });
+
+    document.getElementById("prevMonth").onclick = function () {
+      state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() - 1, 1);
+      render();
+    };
+    document.getElementById("nextMonth").onclick = function () {
+      state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() + 1, 1);
+      render();
+    };
+    document.getElementById("editBudgetBtn").onclick = openBudgetEdit;
+    document.getElementById("saveBudgetBtn").onclick = saveBudget;
+    document.getElementById("budgetInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") saveBudget();
+    });
+
+    document.getElementById("searchInput").addEventListener("input", function (e) {
+      state.searchTerm = e.target.value;
+      renderLedger(expensesForMonth());
+    });
+
+    document.getElementById("exportBtn").onclick = exportCSV;
+    document.getElementById("clearBtn").onclick = clearAll;
+    document.getElementById("themeToggle").onclick = toggleTheme;
+    document.getElementById("langToggle").onclick = toggleLanguage;
+
+    render();
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function () {
+          // Offline caching just won't be available; the app still works online.
+        });
+      });
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
