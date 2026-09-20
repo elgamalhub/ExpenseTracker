@@ -4,9 +4,9 @@ const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png",
-  "./icon-512-maskable.png"
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-512-maskable.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -25,6 +25,9 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Cache-first for the app shell, stale-while-revalidate for everything else
+// (including the Google Fonts CSS/font files), so the app keeps working offline
+// after the first successful load.
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
