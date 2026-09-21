@@ -58,6 +58,12 @@
     --cat-shopping: #A8813F;
     --cat-entertainment: #4A5D7C;
     --cat-other: #9A958A;
+    --cat-custom-1: #7B5675;
+    --cat-custom-2: #4E6E81;
+    --cat-custom-3: #6B7A3A;
+    --cat-custom-4: #A85C41;
+    --cat-custom-5: #3E6B66;
+    --cat-custom-6: #8A7A66;
     --shadow-soft: 0 1px 2px rgba(20,33,61,0.06);
     --radius-s: 3px;
     --radius-m: 6px;
@@ -88,6 +94,12 @@
       --cat-shopping: #D3B678;
       --cat-entertainment: #93A8C9;
       --cat-other: #B8B3A4;
+      --cat-custom-1: #C79FC2;
+      --cat-custom-2: #8FB4C7;
+      --cat-custom-3: #A8B86B;
+      --cat-custom-4: #D89774;
+      --cat-custom-5: #7FB0A8;
+      --cat-custom-6: #C4B49E;
       color-scheme: dark;
     }
   }
@@ -115,6 +127,12 @@
     --cat-shopping: #D3B678;
     --cat-entertainment: #93A8C9;
     --cat-other: #B8B3A4;
+    --cat-custom-1: #C79FC2;
+    --cat-custom-2: #8FB4C7;
+    --cat-custom-3: #A8B86B;
+    --cat-custom-4: #D89774;
+    --cat-custom-5: #7FB0A8;
+    --cat-custom-6: #C4B49E;
     color-scheme: dark;
   }
 
@@ -518,6 +536,84 @@
     cursor: not-allowed;
   }
 
+  /* ---------- New category mini-form ---------- */
+
+  .new-cat-row {
+    display: none;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .new-cat-row.open { display: flex; }
+
+  .new-cat-row input {
+    flex: 1;
+    padding: 9px 10px;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius-s);
+    background: var(--paper);
+    font-size: 0.88rem;
+    color: var(--ink);
+  }
+
+  .new-cat-row button {
+    flex-shrink: 0;
+    padding: 0 14px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: var(--radius-s);
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+
+  /* ---------- Manage categories ---------- */
+
+  .manage-cats {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    display: none;
+  }
+
+  .manage-cats.has-items { display: block; }
+
+  .manage-cats-title {
+    font-size: 0.72rem;
+    color: var(--slate);
+    margin-bottom: 8px;
+  }
+
+  .manage-cat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+  }
+
+  .manage-cat-row .cat-name {
+    flex: 1;
+    width: auto;
+    font-size: 0.85rem;
+  }
+
+  .manage-cat-delete {
+    background: none;
+    border: none;
+    color: var(--slate-soft);
+    font-size: 0.95rem;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: var(--radius-s);
+    line-height: 1;
+  }
+
+  .manage-cat-delete:hover {
+    color: var(--rust);
+    background: var(--rust-soft);
+  }
+
   /* ---------- Filters ---------- */
 
   .filter-row {
@@ -754,11 +850,19 @@
       <input type="date" id="inpDate">
       <select id="inpCategory"></select>
     </div>
+    <div class="new-cat-row" id="newCatRow">
+      <input type="text" id="newCatInput" maxlength="24" placeholder="Category name">
+      <button id="newCatSaveBtn">Add</button>
+    </div>
     <div class="add-form-row2">
       <input type="text" id="inpDesc" placeholder="Description" maxlength="80">
       <input type="text" id="inpAmount" inputmode="decimal" placeholder="Amount">
     </div>
     <button class="add-form-submit" id="addBtn">Add to ledger</button>
+    <div class="manage-cats" id="manageCats">
+      <div class="manage-cats-title" id="manageCatsTitle">Your categories</div>
+      <div id="manageCatsList"></div>
+    </div>
   </div>
 
   <div class="search-row">
@@ -781,7 +885,7 @@
 (function () {
   "use strict";
 
-  var CATEGORIES = [
+  var DEFAULT_CATEGORIES = [
     { id: "housing", en: "Housing", ar: "السكن", varc: "--cat-housing" },
     { id: "food", en: "Food & Dining", ar: "الطعام والمطاعم", varc: "--cat-food" },
     { id: "transport", en: "Transport", ar: "المواصلات", varc: "--cat-transport" },
@@ -791,6 +895,8 @@
     { id: "entertainment", en: "Entertainment", ar: "الترفيه", varc: "--cat-entertainment" },
     { id: "other", en: "Other", ar: "أخرى", varc: "--cat-other" }
   ];
+
+  var CUSTOM_CAT_COLORS = ["--cat-custom-1", "--cat-custom-2", "--cat-custom-3", "--cat-custom-4", "--cat-custom-5", "--cat-custom-6"];
 
   var STRINGS = {
     en: {
@@ -837,6 +943,15 @@
       toastSaveFailed: "Couldn't save — storage unavailable",
       confirmClear: "Delete every expense and budget on this device? This can't be undone.",
       deleteLabel: "Delete",
+      addNewCategoryOption: "+ Add new category",
+      newCategoryPlaceholder: "Category name",
+      addCategoryBtn: "Add",
+      yourCategoriesTitle: "Your categories",
+      toastCategoryAdded: "Category added",
+      toastCategoryExists: "That category already exists",
+      toastCategoryEmpty: "Enter a category name",
+      toastCategoryDeleted: "Category deleted",
+      confirmDeleteCategory: "Delete this category? Any expenses in it will move to \u201cOther.\u201d",
       dateLocale: "en-US"
     },
     ar: {
@@ -883,6 +998,15 @@
       toastSaveFailed: "تعذر الحفظ — التخزين غير متاح",
       confirmClear: "هل تريد حذف كل المصروفات والميزانيات على هذا الجهاز؟ لا يمكن التراجع عن هذا الإجراء.",
       deleteLabel: "حذف",
+      addNewCategoryOption: "+ إضافة فئة جديدة",
+      newCategoryPlaceholder: "اسم الفئة",
+      addCategoryBtn: "إضافة",
+      yourCategoriesTitle: "فئاتك",
+      toastCategoryAdded: "تمت إضافة الفئة",
+      toastCategoryExists: "هذه الفئة موجودة بالفعل",
+      toastCategoryEmpty: "أدخل اسم الفئة",
+      toastCategoryDeleted: "تم حذف الفئة",
+      confirmDeleteCategory: "هل تريد حذف هذه الفئة؟ ستنتقل أي مصروفات ضمنها إلى \u201cأخرى\u201d.",
       dateLocale: "ar"
     }
   };
@@ -891,10 +1015,12 @@
   var BUDGET_KEY = "ledger.budgets.v1";
   var THEME_KEY = "ledger.theme.v1";
   var LANG_KEY = "ledger.lang.v1";
+  var CUSTOM_CAT_KEY = "ledger.customCategories.v1";
 
   var state = {
     expenses: [],
     budgets: {},
+    customCategories: [],
     viewDate: new Date(),
     activeCategory: "all",
     searchTerm: "",
@@ -905,9 +1031,18 @@
     return STRINGS[state.lang][key];
   }
 
+  function allCategories() {
+    var custom = state.customCategories.map(function (c) {
+      return { id: c.id, en: c.name, ar: c.name, varc: CUSTOM_CAT_COLORS[c.colorIndex % CUSTOM_CAT_COLORS.length], custom: true };
+    });
+    return DEFAULT_CATEGORIES.concat(custom);
+  }
+
   function catById(id) {
-    for (var i = 0; i < CATEGORIES.length; i++) if (CATEGORIES[i].id === id) return CATEGORIES[i];
-    return CATEGORIES[CATEGORIES.length - 1];
+    var all = allCategories();
+    for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
+    for (var j = 0; j < DEFAULT_CATEGORIES.length; j++) if (DEFAULT_CATEGORIES[j].id === "other") return DEFAULT_CATEGORIES[j];
+    return DEFAULT_CATEGORIES[DEFAULT_CATEGORIES.length - 1];
   }
 
   function catName(id) {
@@ -958,10 +1093,19 @@
       state.budgets = rawB ? JSON.parse(rawB) : {};
     } catch (e) { state.budgets = {}; }
     try {
+      var rawC = localStorage.getItem(CUSTOM_CAT_KEY);
+      state.customCategories = rawC ? JSON.parse(rawC) : [];
+    } catch (e) { state.customCategories = []; }
+    try {
       var theme = localStorage.getItem(THEME_KEY);
       if (theme) document.documentElement.setAttribute("data-theme", theme);
     } catch (e) {}
     state.lang = detectLanguage();
+  }
+
+  function saveCustomCategories() {
+    try { localStorage.setItem(CUSTOM_CAT_KEY, JSON.stringify(state.customCategories)); }
+    catch (e) {}
   }
 
   function detectLanguage() {
@@ -981,6 +1125,7 @@
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
     applyStaticText();
     populateCategorySelect();
+    renderManageCategories();
     render();
   }
 
@@ -1008,6 +1153,11 @@
     document.getElementById("searchInput").placeholder = t("searchPlaceholder");
     document.getElementById("exportBtn").textContent = t("exportCSV");
     document.getElementById("clearBtn").textContent = t("clearAll");
+    document.getElementById("newCatInput").placeholder = t("newCategoryPlaceholder");
+    document.getElementById("newCatSaveBtn").textContent = t("addCategoryBtn");
+    if (state.customCategories && state.customCategories.length) {
+      document.getElementById("manageCatsTitle").textContent = t("yourCategoriesTitle");
+    }
   }
 
   function saveExpenses() {
@@ -1037,13 +1187,17 @@
     var sel = document.getElementById("inpCategory");
     var prevValue = sel.value;
     sel.innerHTML = "";
-    CATEGORIES.forEach(function (c) {
+    allCategories().forEach(function (c) {
       var opt = document.createElement("option");
       opt.value = c.id;
       opt.textContent = catName(c.id);
       sel.appendChild(opt);
     });
-    if (prevValue) sel.value = prevValue;
+    var addOpt = document.createElement("option");
+    addOpt.value = "__add__";
+    addOpt.textContent = t("addNewCategoryOption");
+    sel.appendChild(addOpt);
+    if (prevValue && prevValue !== "__add__") sel.value = prevValue;
   }
 
   function renderFilterChips() {
@@ -1054,7 +1208,7 @@
     all.textContent = t("allChip");
     all.onclick = function () { state.activeCategory = "all"; render(); };
     row.appendChild(all);
-    CATEGORIES.forEach(function (c) {
+    allCategories().forEach(function (c) {
       var chip = document.createElement("button");
       chip.className = "chip" + (state.activeCategory === c.id ? " active" : "");
       chip.textContent = catName(c.id);
@@ -1244,6 +1398,121 @@
     showToast(t("toastDeleted"));
   }
 
+  // ---------- custom categories ----------
+
+  var categorySelectPrevValue = "other";
+
+  function onCategorySelectChange() {
+    var sel = document.getElementById("inpCategory");
+    if (sel.value === "__add__") {
+      sel.value = categorySelectPrevValue;
+      openNewCategoryForm();
+    } else {
+      categorySelectPrevValue = sel.value;
+    }
+  }
+
+  function openNewCategoryForm() {
+    var row = document.getElementById("newCatRow");
+    row.classList.add("open");
+    var input = document.getElementById("newCatInput");
+    input.value = "";
+    input.focus();
+  }
+
+  function closeNewCategoryForm() {
+    document.getElementById("newCatRow").classList.remove("open");
+  }
+
+  function slugify(name) {
+    var base = "custom-" + name.toLowerCase().trim().replace(/[^a-z0-9\u0600-\u06FF]+/g, "-").replace(/^-+|-+$/g, "");
+    var candidate = base || ("custom-" + uid());
+    var existingIds = allCategories().map(function (c) { return c.id; });
+    var finalId = candidate;
+    var n = 2;
+    while (existingIds.indexOf(finalId) !== -1) {
+      finalId = candidate + "-" + n;
+      n++;
+    }
+    return finalId;
+  }
+
+  function addCustomCategory() {
+    var input = document.getElementById("newCatInput");
+    var name = input.value.trim();
+    if (!name) {
+      showToast(t("toastCategoryEmpty"));
+      input.focus();
+      return;
+    }
+    var isDuplicate = allCategories().some(function (c) {
+      return catNameFor(c).toLowerCase() === name.toLowerCase();
+    });
+    if (isDuplicate) {
+      showToast(t("toastCategoryExists"));
+      input.focus();
+      return;
+    }
+    var newCat = {
+      id: slugify(name),
+      name: name,
+      colorIndex: state.customCategories.length
+    };
+    state.customCategories.push(newCat);
+    saveCustomCategories();
+    populateCategorySelect();
+    document.getElementById("inpCategory").value = newCat.id;
+    categorySelectPrevValue = newCat.id;
+    closeNewCategoryForm();
+    renderManageCategories();
+    showToast(t("toastCategoryAdded"));
+  }
+
+  function catNameFor(c) {
+    return state.lang === "ar" ? c.ar : c.en;
+  }
+
+  function deleteCustomCategory(id) {
+    if (!confirm(t("confirmDeleteCategory"))) return;
+    state.expenses.forEach(function (e) {
+      if (e.category === id) e.category = "other";
+    });
+    state.customCategories = state.customCategories.filter(function (c) { return c.id !== id; });
+    saveExpenses();
+    saveCustomCategories();
+    populateCategorySelect();
+    if (document.getElementById("inpCategory").value === "") {
+      document.getElementById("inpCategory").value = "other";
+      categorySelectPrevValue = "other";
+    }
+    if (state.activeCategory === id) state.activeCategory = "all";
+    renderManageCategories();
+    render();
+    showToast(t("toastCategoryDeleted"));
+  }
+
+  function renderManageCategories() {
+    var wrap = document.getElementById("manageCats");
+    var list = document.getElementById("manageCatsList");
+    list.innerHTML = "";
+    if (!state.customCategories.length) {
+      wrap.classList.remove("has-items");
+      return;
+    }
+    wrap.classList.add("has-items");
+    document.getElementById("manageCatsTitle").textContent = t("yourCategoriesTitle");
+    state.customCategories.forEach(function (c) {
+      var row = document.createElement("div");
+      row.className = "manage-cat-row";
+      row.innerHTML =
+        '<span class="cat-dot" style="background:var(' + CUSTOM_CAT_COLORS[c.colorIndex % CUSTOM_CAT_COLORS.length] + ')"></span>' +
+        '<span class="cat-name">' + escapeHtml(c.name) + '</span>' +
+        '<button class="manage-cat-delete" aria-label="' + escapeHtml(t("deleteLabel")) + '">\u00D7</button>';
+      row.querySelector(".manage-cat-delete").onclick = function () { deleteCustomCategory(c.id); };
+      list.appendChild(row);
+    });
+  }
+
   function openBudgetEdit() {
     var row = document.getElementById("budgetEditRow");
     var key = monthKey(state.viewDate);
@@ -1341,10 +1610,19 @@
     applyStaticText();
     populateCategorySelect();
     document.getElementById("inpDate").value = todayISO();
+    categorySelectPrevValue = document.getElementById("inpCategory").value || "other";
+    renderManageCategories();
 
     document.getElementById("addBtn").onclick = addExpense;
     document.getElementById("inpAmount").addEventListener("keydown", function (e) {
       if (e.key === "Enter") addExpense();
+    });
+
+    document.getElementById("inpCategory").addEventListener("change", onCategorySelectChange);
+    document.getElementById("newCatSaveBtn").onclick = addCustomCategory;
+    document.getElementById("newCatInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); addCustomCategory(); }
+      if (e.key === "Escape") closeNewCategoryForm();
     });
 
     document.getElementById("prevMonth").onclick = function () {
